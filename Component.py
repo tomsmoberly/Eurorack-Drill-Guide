@@ -36,6 +36,11 @@ component_markers = {
     ComponentType.POT: 'P'
 }
 
+component_drill_diameters = {
+    ComponentType.PJ398SM: 6.1,
+    ComponentType.POT: 6.1
+}
+
 class Component:
     def __init__(self):
         pass
@@ -48,4 +53,5 @@ class Component:
         self.padding = component_padding[component_type]
         self.drill_offsets = component_drill_offsets[component_type]
         self.marker = component_markers[component_type]
+        self.drill_diameters = component_drill_diameters[component_type]
 

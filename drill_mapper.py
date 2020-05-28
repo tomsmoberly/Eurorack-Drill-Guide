@@ -8,19 +8,13 @@ doepfer_measurements = {1:5.00, 2:9.80, 3:15, 4: 20.00, 6: 30.00, 8: 40.30, 10:5
 def print_drill_map(module_width):
     print('Module width =', str(module_width) + 'HP,', 'which is', str(doepfer_measurements[module_width]), 'mm.')
 
-def drill_map(module_width):
-    while module_width not in doepfer_measurements:
-        module_width = module_width + 1
-        if (module_width > 100):
-            print('Something has gone wrong. Could not find a module width that fit.')
-            quit()
-
 # pixels per mm
-ppmm = 11.81103
+ppmm = Board.ppi*0.0393701
 
 def create_outline(board, padding, stroke):
     pixel_width = board.width * ppmm
     i_pixel_width = int(pixel_width)
+    #TODO handle if too many holes in stripboard and board is >128.5 OR if it's > 112 or so
     pixel_height = 128.5 * ppmm
     i_pixel_height = int(pixel_height)
 
@@ -91,6 +85,22 @@ def drill_mark_px(pixels, radius, mid_x, mid_y):
             if (rx * rx + ry * ry <= radius * radius):
                 pixels[mid_y+ry][mid_x+rx] = (0, 0, 0)
 
+def drill_outline_px(pixels, r, thickness, mid_x, mid_y):
+    mid_x = int(mid_x)
+    mid_y = int(mid_y)
+
+    # print('mid_xy', mid_x, mid_y)
+    for i in range(thickness-1):
+        radius = r+i
+        for y in range(radius*2+1):
+            for x in range(radius*2+1):
+                rx = x-radius
+                ry = y-radius
+                if (rx * rx + ry * ry > radius * radius - radius and rx * rx + ry * ry < radius * radius + radius):
+                    pixels[mid_y+ry][mid_x+rx] = (0, 0, 0)
+                # if (rx * rx + ry * ry <= radius * radius):
+                #     pixels[mid_y+ry][mid_x+rx] = (0, 0, 0)
+
 
 def get_drill_positions(board):
     x_center = board.width/2
@@ -104,22 +114,32 @@ def get_drill_positions(board):
     drill_marks = list()
     for br in board.board_rows:
         for comp in br.row:
-            drill_marks.append( (x_zero+comp.x_offset*2.54+comp.drill_offsets[0],
-                                 y_zero+comp.y_offset*2.54+comp.drill_offsets[1]) )
-    return drill_marks
+            comp.global_drill_offsets = (x_zero + comp.x_offset * 2.54 + comp.drill_offsets[0],
+                                         y_zero + comp.y_offset * 2.54 + comp.drill_offsets[1])
 
-def create_drill_guide(board, padding, stroke, radius):
+def create_drill_guide(board, padding, stroke, radius, display):
     pixels = create_outline(board, padding, stroke)
     drills = get_drill_positions(board)
-    for drill in drills:
-        drill_mark_px(pixels, radius, padding+drill[0]*ppmm, padding+drill[1]*ppmm)
+    for br in board.board_rows:
+        for comp in br.row:
+            drill_mark_px(pixels, radius, padding + comp.global_drill_offsets[0] * ppmm,
+                          padding + comp.global_drill_offsets[1] * ppmm)
+            drill_outline_px(pixels, int((comp.drill_diameters / 2) * ppmm)-stroke//2, stroke,
+                             padding + comp.global_drill_offsets[0] * ppmm,
+                             padding + comp.global_drill_offsets[1] * ppmm)
+            # drill_outline_px(pixels, int((comp.drill_diameters / 2) * ppmm)+1,
+            #                  padding + comp.global_drill_offsets[0] * ppmm,
+            #                  padding + comp.global_drill_offsets[1] * ppmm)
 
     # convert pixels to numpy array
-    numpy_array = np.array(pixels, dtype=np.uint8)
-
-    # create image from pix array
-    output_image = Image.fromarray(numpy_array)
-    output_image.save('board.png')
-
-    # im = Image.open("board.png")
-    # im.show()
+    return pixels
+    # numpy_array = np.array(pixels, dtype=np.uint8)
+    #
+    # # create image from pix array
+    # output_image = Image.fromarray(numpy_array)
+    # output_image.save('panel.bmp')
+    # output_image.save('panel.pdf', resolution=Board.ppi, title="Eurorack Panel", author="Eurodrill v0.1")
+    #
+    # if(display):
+    #     im = Image.open("panel.bmp")
+    #     im.show()
